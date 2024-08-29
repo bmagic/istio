@@ -20,6 +20,7 @@ import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
+import "k8s.io/api/autoscaling/v2/generated.proto";
 import "k8s.io/api/core/v1/generated.proto";
 import "k8s.io/apimachinery/pkg/apis/meta/v1/generated.proto";
 
@@ -1448,4 +1449,35 @@ message WaypointConfig {
   //
   // See https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#inter-pod-affinity-and-anti-affinity
   k8s.io.api.core.v1.Affinity affinity = 2;
+
+  // K8s replicas for waypoint pods.
+  // 
+  // See https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#scaling-a-deployment
+  int32 replicas = 3;
+
+  // K8s autoscaling configuration
+  WaypointAutoscalingConfig autoscaling = 4;
+}
+
+// Configuration for Waypoint autoscaling.
+message WaypointAutoscalingConfig { 
+  // Controls whether autoscaling is enabled.
+  google.protobuf.BoolValue enabled = 1;
+
+  // Minimum number of replicas.
+  uint32 minReplicas = 2;
+
+  // Maximum number of replicas.
+  uint32 maxReplicas = 3;
+
+  // Target CPU utilization percentage.
+  IntOrString targetCPU = 4;
+
+  // Target memory utilization percentage.
+  IntOrString targetMemory = 5;
+
+  // Behavior configuration for autoscaling.
+  //
+  // See https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/#support-for-configurable-scaling-behavior
+  k8s.io.api.autoscaling.v2.HorizontalPodAutoscalerBehavior behavior = 6;
 }

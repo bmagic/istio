@@ -92,6 +92,15 @@
     "variant": "",
     "waypoint": {
       "affinity": {},
+      "autoscaling": {
+        "behavior": {},
+        "enabled": false,
+        "maxReplicas": 5,
+        "minReplicas": 1,
+        "targetCPU": "60",
+        "targetMemory": ""
+      },
+      "replicas": 1,
       "resources": {
         "limits": {
           "cpu": "2",

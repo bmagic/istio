@@ -420,6 +420,8 @@ defaults:
     # mechanisms (e.g., environmental variable CA_PROVIDER).
     caName: ""
     waypoint:
+      # Replicas for the waypoint proxy.
+      replicas: 1
       # Resources for the waypoint proxy.
       resources:
         requests:
@@ -428,6 +430,14 @@ defaults:
         limits:
           cpu: "2"
           memory: 1Gi
+      # Create HorizontalPodAutoscaler object for the waypoint proxy.
+      autoscaling:
+        enabled: false
+        minReplicas: 1
+        maxReplicas: 5
+        targetCPU: "60"
+        targetMemory: ""
+        behavior: {}
       # If specified, affinity defines the scheduling constraints of waypoint pods.
       affinity: {}
   base:

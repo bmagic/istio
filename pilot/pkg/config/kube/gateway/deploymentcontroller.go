@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	appsv1 "k8s.io/api/apps/v1"
+	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -86,14 +87,15 @@ type DeploymentController struct {
 	gateways       kclient.Client[*gateway.Gateway]
 	gatewayClasses kclient.Client[*gateway.GatewayClass]
 
-	clients         map[schema.GroupVersionResource]getter
-	injectConfig    func() inject.WebhookConfig
-	deployments     kclient.Client[*appsv1.Deployment]
-	services        kclient.Client[*corev1.Service]
-	serviceAccounts kclient.Client[*corev1.ServiceAccount]
-	namespaces      kclient.Client[*corev1.Namespace]
-	tagWatcher      revisions.TagWatcher
-	revision        string
+	clients                  map[schema.GroupVersionResource]getter
+	injectConfig             func() inject.WebhookConfig
+	deployments              kclient.Client[*appsv1.Deployment]
+	horizontalPodAutoscalers kclient.Client[*autoscalingv2.HorizontalPodAutoscaler]
+	services                 kclient.Client[*corev1.Service]
+	serviceAccounts          kclient.Client[*corev1.ServiceAccount]
+	namespaces               kclient.Client[*corev1.Namespace]
+	tagWatcher               revisions.TagWatcher
+	revision                 string
 }
 
 // Patcher is a function that abstracts patching logic. This is largely because client-go fakes do not handle patching
@@ -221,6 +223,10 @@ func NewDeploymentController(client kube.Client, clusterID cluster.ID, env *mode
 	dc.deployments.AddEventHandler(parentHandler)
 	dc.clients[gvr.Deployment] = NewUntypedWrapper(dc.deployments)
 
+	dc.horizontalPodAutoscalers = kclient.NewFiltered[*autoscalingv2.HorizontalPodAutoscaler](client, filter)
+	dc.horizontalPodAutoscalers.AddEventHandler(parentHandler)
+	dc.clients[gvr.HorizontalPodAutoscaler] = NewUntypedWrapper(dc.horizontalPodAutoscalers)
+
 	dc.serviceAccounts = kclient.NewFiltered[*corev1.ServiceAccount](client, filter)
 	dc.serviceAccounts.AddEventHandler(parentHandler)
 	dc.clients[gvr.ServiceAccount] = NewUntypedWrapper(dc.serviceAccounts)
@@ -261,6 +267,7 @@ func (d *DeploymentController) Run(stop <-chan struct{}) {
 		stop,
 		d.namespaces.HasSynced,
 		d.deployments.HasSynced,
+		d.horizontalPodAutoscalers.HasSynced,
 		d.services.HasSynced,
 		d.serviceAccounts.HasSynced,
 		d.gateways.HasSynced,
@@ -268,7 +275,7 @@ func (d *DeploymentController) Run(stop <-chan struct{}) {
 		d.tagWatcher.HasSynced,
 	)
 	d.queue.Run(stop)
-	controllers.ShutdownAll(d.namespaces, d.deployments, d.services, d.serviceAccounts, d.gateways, d.gatewayClasses)
+	controllers.ShutdownAll(d.namespaces, d.deployments, d.horizontalPodAutoscalers, d.services, d.serviceAccounts, d.gateways, d.gatewayClasses)
 }
 
 // Reconcile takes in the name of a Gateway and ensures the cluster is in the desired state

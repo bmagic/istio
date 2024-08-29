@@ -40,6 +40,7 @@ metadata:
     name: "{{.Name}}"
     uid: "{{.UID}}"
 spec:
+  replicas: {{.Values.global.waypoint.replicas }}
   selector:
     matchLabels:
       "{{.GatewayNameLabel}}": "{{.Name}}"
@@ -306,4 +307,52 @@ spec:
   loadBalancerIP: {{ (index .Spec.Addresses 0).Value | quote}}
   {{- end }}
   type: {{ .ServiceType | quote }}
+---
+{{- if .Values.global.waypoint.autoscaling.enabled }}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  annotations:
+    {{ toJsonMap (omit .InfrastructureAnnotations "kubectl.kubernetes.io/last-applied-configuration" "gateway.istio.io/name-override" "gateway.istio.io/service-account" "gateway.istio.io/controller-version") | nindent 4 }}
+  labels:
+    {{- toJsonMap
+      .InfrastructureLabels
+      (strdict
+        "gateway.networking.k8s.io/gateway-name" .Name
+      ) | nindent 4 }}
+  name: {{.DeploymentName | quote}}
+  namespace: {{.Namespace | quote}}
+  ownerReferences:
+  - apiVersion: gateway.networking.k8s.io/v1beta1
+    kind: Gateway
+    name: "{{.Name}}"
+    uid: "{{.UID}}"
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{.DeploymentName | quote}}
+  minReplicas: {{ .Values.global.waypoint.autoscaling.minReplicas }}
+  maxReplicas: {{ .Values.global.waypoint.autoscaling.maxReplicas }}
+  metrics:
+    {{- if .Values.global.waypoint.autoscaling.targetMemory }}
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.global.waypoint.autoscaling.targetMemory }}
+    {{- end }}
+    {{- if .Values.global.waypoint.autoscaling.targetCPU }}
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.global.waypoint.autoscaling.targetCPU }}
+    {{- end }}
+  {{- if .Values.global.waypoint.autoscaling.behavior }}
+  behavior: {{ toYaml .Values.global.waypoint.autoscaling.behavior | nindent 4 }}
+  {{- end }}
+{{- end }}
 ---
